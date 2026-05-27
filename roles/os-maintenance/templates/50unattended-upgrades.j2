@@ -6,14 +6,7 @@ Unattended-Upgrade::Allowed-Origins {
     "Raspbian:${distro_codename}";
 };
 
-// Kernel and firmware are excluded: nodes boot via NFS/iSCSI from Synology NAS.
-// /boot/firmware is not locally mounted, so kernel post-install scripts fail.
 Unattended-Upgrade::Package-Blacklist {
-    "linux-image-*";
-    "linux-headers-*";
-    "linux-libc-dev";
-    "raspi-firmware";
-    "raspi-config";
 };
 
 Unattended-Upgrade::AutoFixInterruptedDpkg "true";
