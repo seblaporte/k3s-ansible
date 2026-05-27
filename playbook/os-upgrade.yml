@@ -4,6 +4,10 @@
 # Agents are upgraded one at a time (serial: 1) with drain/uncordon to avoid downtime.
 # Server is upgraded last — no drain possible (single control plane), brief API unavailability expected.
 #
+# IMPORTANT: Kernel and firmware packages are held before upgrade because the nodes boot
+# from a Synology NAS (NFS/iSCSI). The /boot/firmware partition is not locally mounted,
+# so kernel post-install scripts fail. Kernel upgrades must be handled manually.
+#
 # Run with: ansible-playbook playbook/os-upgrade.yml -i inventory.yml
 # To upgrade agents only: ansible-playbook playbook/os-upgrade.yml -i inventory.yml --limit agent
 # To upgrade server only: ansible-playbook playbook/os-upgrade.yml -i inventory.yml --limit server
@@ -14,6 +18,19 @@
   gather_facts: true
   serial: 1
   tasks:
+    - name: Hold kernel and firmware packages (NFS/iSCSI network boot — /boot/firmware not locally mounted)
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - linux-image-rpi-v8
+        - linux-image-rpi-2712
+        - linux-headers-rpi-v8
+        - linux-headers-rpi-2712
+        - raspi-firmware
+        - raspi-config
+        - linux-libc-dev
+
     - name: Cordon node
       ansible.builtin.command: kubectl cordon {{ ansible_hostname }}
       delegate_to: localhost
@@ -34,7 +51,7 @@
       ansible.builtin.apt:
         update_cache: true
 
-    - name: Upgrade all packages
+    - name: Upgrade all packages (kernel/firmware excluded via hold)
       ansible.builtin.apt:
         upgrade: dist
         autoremove: true
@@ -66,11 +83,24 @@
   gather_facts: true
   serial: 1
   tasks:
+    - name: Hold kernel and firmware packages (NFS/iSCSI network boot — /boot/firmware not locally mounted)
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - linux-image-rpi-v8
+        - linux-image-rpi-2712
+        - linux-headers-rpi-v8
+        - linux-headers-rpi-2712
+        - raspi-firmware
+        - raspi-config
+        - linux-libc-dev
+
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
 
-    - name: Upgrade all packages
+    - name: Upgrade all packages (kernel/firmware excluded via hold)
       ansible.builtin.apt:
         upgrade: dist
         autoremove: true
