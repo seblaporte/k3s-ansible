@@ -1,0 +1,18 @@
+// Security updates only — full OS upgrades are handled by playbook/os-upgrade.yml
+// Auto-reboot is disabled — use kured for rolling reboots (https://github.com/kubereboot/kured)
+
+Unattended-Upgrade::Allowed-Origins {
+    "Debian:${distro_codename}-security";
+    "Raspbian:${distro_codename}";
+};
+
+Unattended-Upgrade::Package-Blacklist {
+};
+
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+
+// Reboot is managed by kured — it watches /var/run/reboot-required and does a rolling drain/reboot
+Unattended-Upgrade::Automatic-Reboot "false";
