@@ -58,6 +58,7 @@
         kubectl drain {{ ansible_hostname }}
         --ignore-daemonsets
         --delete-emptydir-data
+        --disable-eviction
         --timeout=120s
       delegate_to: localhost
       become: false
