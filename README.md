@@ -177,6 +177,10 @@ This is set up in `/etc/fstab` on each node:
 
 When `apt` installs a new kernel, the post-install scripts write `kernel8.img` and `initramfs8` to `/boot/firmware/`, which resolves to `/boot/` and is therefore written directly to the NFS share on the NAS. The Pi picks up the new files on next boot.
 
+**Reboot detection:**
+
+Raspberry Pi OS does **not** create `/var/run/reboot-required` after a kernel upgrade (unlike standard Debian/Ubuntu with GRUB — there is no bootloader to notify). The playbook therefore uses a secondary check: it compares the modification time of `/boot/kernel8.img` against the system's last boot time. If the kernel file on the NFS share is newer than the last boot, a reboot is triggered.
+
 **iSCSI in the initramfs:**
 
 For the Pi to mount its root filesystem on boot, the iSCSI initiator must be present in the initramfs. This is handled automatically by `update-initramfs` because `/etc/iscsi/iscsi.initramfs` exists on each node (its presence is the trigger for the open-iscsi initramfs hook).

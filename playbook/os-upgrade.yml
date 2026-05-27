@@ -92,10 +92,18 @@
         path: /var/run/reboot-required
       register: reboot_required_file
 
+    - name: Check if kernel8.img was updated since last boot (RPi does not create reboot-required on kernel upgrade)
+      ansible.builtin.shell: |
+        boot_time=$(date -d "$(uptime -s)" +%s)
+        kernel_mtime=$(stat -c %Y /boot/kernel8.img)
+        [ "$kernel_mtime" -gt "$boot_time" ] && echo "reboot_needed" || echo "up_to_date"
+      register: rpi_kernel_check
+      changed_when: false
+
     - name: Reboot if required
       ansible.builtin.reboot:
         reboot_timeout: 600
-      when: reboot_required_file.stat.exists
+      when: reboot_required_file.stat.exists or 'reboot_needed' in rpi_kernel_check.stdout
 
     - name: Uncordon node
       ansible.builtin.command: kubectl uncordon {{ ansible_hostname }}
@@ -169,8 +177,16 @@
         path: /var/run/reboot-required
       register: reboot_required_file
 
+    - name: Check if kernel8.img was updated since last boot (RPi does not create reboot-required on kernel upgrade)
+      ansible.builtin.shell: |
+        boot_time=$(date -d "$(uptime -s)" +%s)
+        kernel_mtime=$(stat -c %Y /boot/kernel8.img)
+        [ "$kernel_mtime" -gt "$boot_time" ] && echo "reboot_needed" || echo "up_to_date"
+      register: rpi_kernel_check
+      changed_when: false
+
     - name: Reboot if required
       ansible.builtin.reboot:
         reboot_timeout: 600
         test_command: kubectl get nodes
-      when: reboot_required_file.stat.exists
+      when: reboot_required_file.stat.exists or 'reboot_needed' in rpi_kernel_check.stdout
