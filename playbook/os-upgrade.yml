@@ -77,6 +77,10 @@
       become: false
       changed_when: true
 
+    - name: Mark open-iscsi as manually installed to prevent autoremove from breaking iSCSI initramfs
+      ansible.builtin.command: apt-mark manual open-iscsi
+      changed_when: false
+
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
@@ -84,7 +88,6 @@
     - name: Upgrade all packages
       ansible.builtin.apt:
         upgrade: dist
-        autoremove: true
         autoclean: true
 
     - name: Check if reboot is required
@@ -162,6 +165,10 @@
         state: present
         update_cache: true
 
+    - name: Mark open-iscsi as manually installed to prevent autoremove from breaking iSCSI initramfs
+      ansible.builtin.command: apt-mark manual open-iscsi
+      changed_when: false
+
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
@@ -169,7 +176,6 @@
     - name: Upgrade all packages
       ansible.builtin.apt:
         upgrade: dist
-        autoremove: true
         autoclean: true
 
     - name: Check if reboot is required
