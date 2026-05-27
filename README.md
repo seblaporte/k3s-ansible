@@ -101,6 +101,111 @@ Assuming you have [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) ins
 kubectl get nodes
 ```
 
+## OS Upgrade
+
+A playbook is provided to perform a rolling OS upgrade (`apt dist-upgrade`) across all nodes in the cluster, one node at a time.
+
+```bash
+ansible-playbook playbook/os-upgrade.yml -i inventory.yml
+```
+
+To upgrade only agents or only the server:
+
+```bash
+ansible-playbook playbook/os-upgrade.yml -i inventory.yml --limit agent
+ansible-playbook playbook/os-upgrade.yml -i inventory.yml --limit server
+```
+
+**How it works:**
+
+- Each agent node is processed one at a time (`serial: 1`):
+  1. `kubectl cordon` + `kubectl drain` to evict workloads
+  2. `apt-get dist-upgrade` — upgrades all packages including kernel
+  3. Reboot if `/var/run/reboot-required` exists (timeout: 600s)
+  4. `kubectl uncordon` + 60s pause for pods to reschedule
+- The server (control plane) is upgraded last, without drain (single control plane). A brief API unavailability (~2–3 min) is expected during its reboot.
+
+### Raspberry Pi nodes booting from a NAS (NFS + iSCSI)
+
+This playbook handles a specific architecture where Raspberry Pi nodes have no local storage: the boot partition is served over NFS and the root filesystem is mounted over iSCSI from a Synology NAS.
+
+**Architecture overview:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Synology NAS (192.168.1.10)                        │
+│                                                     │
+│  /volume1/rpi-tftpboot/<serial>/   ← NFS boot dir  │
+│    kernel8.img                     ← kernel        │
+│    initramfs8                      ← initramfs     │
+│    config.txt, cmdline.txt, ...                     │
+│                                                     │
+│  iSCSI target per node             ← root (/)       │
+└─────────────────────────────────────────────────────┘
+         │ NFS (/boot)          │ iSCSI (/)
+         ▼                      ▼
+┌────────────────────────────────────────────────────┐
+│  Raspberry Pi node                                 │
+│   /boot        ← NFS-mounted boot dir              │
+│   /            ← iSCSI root filesystem             │
+│   /boot/firmware ← bind mount of /boot (see below) │
+└────────────────────────────────────────────────────┘
+```
+
+Each Pi has its own dedicated directory on the NAS (named after its serial number). The NAS serves `kernel8.img` and `initramfs8` via TFTP/NFS at boot time. The root filesystem is a per-node iSCSI LUN on the NAS.
+
+**The `/boot/firmware` bind mount:**
+
+Modern Raspberry Pi OS kernel and firmware packages (bookworm and later) write their files to `/boot/firmware/`, but on this network-boot setup the boot partition is mounted at `/boot/`. Without intervention, kernel post-install scripts fail with:
+
+```
+raspi-firmware: missing /boot/firmware, did you forget to mount it?
+```
+
+The playbook solves this by creating a bind mount so both paths point to the same NFS share:
+
+```
+/boot  →  bind-mounted at  →  /boot/firmware
+```
+
+This is set up in `/etc/fstab` on each node:
+
+```
+192.168.1.10:/volume1/rpi-tftpboot/<serial>  /boot           nfs   defaults,_netdev  0 0
+/boot                                         /boot/firmware  none  bind,_netdev      0 0
+```
+
+When `apt` installs a new kernel, the post-install scripts write `kernel8.img` and `initramfs8` to `/boot/firmware/`, which resolves to `/boot/` and is therefore written directly to the NFS share on the NAS. The Pi picks up the new files on next boot.
+
+**iSCSI in the initramfs:**
+
+For the Pi to mount its root filesystem on boot, the iSCSI initiator must be present in the initramfs. This is handled automatically by `update-initramfs` because `/etc/iscsi/iscsi.initramfs` exists on each node (its presence is the trigger for the open-iscsi initramfs hook).
+
+The `config.txt` on each node contains `auto_initramfs=1`, which instructs the Pi firmware to automatically load the initramfs matching the kernel (`kernel8.img` → `initramfs8`).
+
+You can verify iSCSI is included in the current initramfs with:
+
+```bash
+lsinitramfs /boot/initramfs8 | grep iscsi
+```
+
+### Ongoing security maintenance
+
+A role is provided to configure `unattended-upgrades` for automatic security-only patches (no reboot — pair with [kured](https://github.com/kubereboot/kured) for automated rolling reboots):
+
+```bash
+ansible-playbook playbook/site.yml -i inventory.yml --tags os-maintenance
+```
+
+Or apply the role directly:
+
+```yaml
+- hosts: k3s_cluster
+  become: true
+  roles:
+    - role: os-maintenance
+```
+
 ## Local Testing
 
 A Vagrantfile is provided that provision a 5 nodes cluster using Vagrant (LibVirt or Virtualbox as provider). To use it:
