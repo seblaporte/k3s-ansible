@@ -81,6 +81,19 @@
       ansible.builtin.command: apt-mark manual open-iscsi
       changed_when: false
 
+    - name: Ensure /etc/iscsi/iscsi.initramfs exists (triggers iSCSI inclusion in initramfs on kernel install)
+      ansible.builtin.file:
+        path: /etc/iscsi/iscsi.initramfs
+        state: touch
+        mode: "0644"
+        modification_time: preserve
+        access_time: preserve
+
+    - name: Save /boot/cmdline.txt before upgrade (raspi-firmware may replace it with a redirect placeholder)
+      ansible.builtin.slurp:
+        src: /boot/cmdline.txt
+      register: cmdline_backup
+
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
@@ -89,6 +102,19 @@
       ansible.builtin.apt:
         upgrade: dist
         autoclean: true
+
+    - name: Check if /boot/cmdline.txt was replaced with a redirect placeholder by raspi-firmware
+      ansible.builtin.shell: grep -q 'DO NOT EDIT' /boot/cmdline.txt && echo replaced || echo ok
+      register: cmdline_state
+      changed_when: false
+      failed_when: false
+
+    - name: Restore /boot/cmdline.txt if replaced with redirect placeholder
+      ansible.builtin.copy:
+        content: "{{ cmdline_backup.content | b64decode }}"
+        dest: /boot/cmdline.txt
+        mode: "0755"
+      when: cmdline_state.stdout == 'replaced'
 
     - name: Check if reboot is required
       ansible.builtin.stat:
@@ -169,6 +195,19 @@
       ansible.builtin.command: apt-mark manual open-iscsi
       changed_when: false
 
+    - name: Ensure /etc/iscsi/iscsi.initramfs exists (triggers iSCSI inclusion in initramfs on kernel install)
+      ansible.builtin.file:
+        path: /etc/iscsi/iscsi.initramfs
+        state: touch
+        mode: "0644"
+        modification_time: preserve
+        access_time: preserve
+
+    - name: Save /boot/cmdline.txt before upgrade (raspi-firmware may replace it with a redirect placeholder)
+      ansible.builtin.slurp:
+        src: /boot/cmdline.txt
+      register: cmdline_backup
+
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
@@ -177,6 +216,19 @@
       ansible.builtin.apt:
         upgrade: dist
         autoclean: true
+
+    - name: Check if /boot/cmdline.txt was replaced with a redirect placeholder by raspi-firmware
+      ansible.builtin.shell: grep -q 'DO NOT EDIT' /boot/cmdline.txt && echo replaced || echo ok
+      register: cmdline_state
+      changed_when: false
+      failed_when: false
+
+    - name: Restore /boot/cmdline.txt if replaced with redirect placeholder
+      ansible.builtin.copy:
+        content: "{{ cmdline_backup.content | b64decode }}"
+        dest: /boot/cmdline.txt
+        mode: "0755"
+      when: cmdline_state.stdout == 'replaced'
 
     - name: Check if reboot is required
       ansible.builtin.stat:
