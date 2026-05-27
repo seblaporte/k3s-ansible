@@ -38,6 +38,19 @@
       failed_when: mount_result.rc != 0 and 'already mounted' not in mount_result.stderr
       changed_when: mount_result.rc == 0
 
+    - name: Unhold kernel and firmware packages (clean up any holds from previous runs)
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop:
+        - linux-image-rpi-v8
+        - linux-image-rpi-2712
+        - linux-headers-rpi-v8
+        - linux-headers-rpi-2712
+        - raspi-firmware
+        - raspi-config
+        - linux-libc-dev
+
     - name: Ensure kernel metapackages are installed (may have been removed on previous failed run)
       ansible.builtin.apt:
         name:
@@ -118,6 +131,19 @@
       register: mount_result
       failed_when: mount_result.rc != 0 and 'already mounted' not in mount_result.stderr
       changed_when: mount_result.rc == 0
+
+    - name: Unhold kernel and firmware packages (clean up any holds from previous runs)
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop:
+        - linux-image-rpi-v8
+        - linux-image-rpi-2712
+        - linux-headers-rpi-v8
+        - linux-headers-rpi-2712
+        - raspi-firmware
+        - raspi-config
+        - linux-libc-dev
 
     - name: Ensure kernel metapackages are installed
       ansible.builtin.apt:
